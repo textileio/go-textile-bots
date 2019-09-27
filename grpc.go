@@ -1,8 +1,6 @@
 package textilebots
 
 import (
-	"fmt"
-
 	hclog "github.com/hashicorp/go-hclog"
 	plugin "github.com/hashicorp/go-plugin"
 	shared "github.com/textileio/go-textile-core/bots"
@@ -65,8 +63,9 @@ func (m *GRPCClient) Delete(q []byte, st shared.BotStore, i shared.IpfsHandler) 
 	}
 
 	return shared.Response{
-		Status: resp.Status,
-		Body:   resp.Body,
+		Status:      resp.Status,
+		Body:        resp.Body,
+		ContentType: resp.ContentType,
 	}, nil
 }
 
@@ -108,8 +107,9 @@ func (m *GRPCClient) Put(q []byte, st shared.BotStore, i shared.IpfsHandler) (sh
 	}
 
 	return shared.Response{
-		Status: resp.Status,
-		Body:   resp.Body,
+		Status:      resp.Status,
+		Body:        resp.Body,
+		ContentType: resp.ContentType,
 	}, nil
 }
 
@@ -151,8 +151,9 @@ func (m *GRPCClient) Post(q []byte, st shared.BotStore, i shared.IpfsHandler) (s
 	}
 
 	return shared.Response{
-		Status: resp.Status,
-		Body:   resp.Body,
+		Status:      resp.Status,
+		Body:        resp.Body,
+		ContentType: resp.ContentType,
 	}, nil
 }
 
@@ -194,8 +195,9 @@ func (m *GRPCClient) Get(q []byte, st shared.BotStore, i shared.IpfsHandler) (sh
 	}
 
 	return shared.Response{
-		Status: resp.Status,
-		Body:   resp.Body,
+		Status:      resp.Status,
+		Body:        resp.Body,
+		ContentType: resp.ContentType,
 	}, nil
 }
 
@@ -230,7 +232,7 @@ func (m *GRPCServer) Delete(ctx context.Context, req *proto.APIRequest) (*proto.
 	if err != nil {
 		return nil, err
 	}
-	return &proto.BotResponse{Status: res.Status, Body: res.Body}, nil
+	return &proto.BotResponse{Status: res.Status, Body: res.Body, ContentType: res.ContentType}, nil
 }
 
 func (m *GRPCServer) Put(ctx context.Context, req *proto.APIRequest) (*proto.BotResponse, error) {
@@ -253,7 +255,7 @@ func (m *GRPCServer) Put(ctx context.Context, req *proto.APIRequest) (*proto.Bot
 	if err != nil {
 		return nil, err
 	}
-	return &proto.BotResponse{Status: res.Status, Body: res.Body}, nil
+	return &proto.BotResponse{Status: res.Status, Body: res.Body, ContentType: res.ContentType}, nil
 }
 
 func (m *GRPCServer) Post(ctx context.Context, req *proto.APIRequest) (*proto.BotResponse, error) {
@@ -276,7 +278,7 @@ func (m *GRPCServer) Post(ctx context.Context, req *proto.APIRequest) (*proto.Bo
 	if err != nil {
 		return nil, err
 	}
-	return &proto.BotResponse{Status: res.Status, Body: res.Body}, nil
+	return &proto.BotResponse{Status: res.Status, Body: res.Body, ContentType: res.ContentType}, nil
 }
 
 func (m *GRPCServer) Get(ctx context.Context, req *proto.APIRequest) (*proto.BotResponse, error) {
@@ -299,7 +301,7 @@ func (m *GRPCServer) Get(ctx context.Context, req *proto.APIRequest) (*proto.Bot
 	if err != nil {
 		return nil, err
 	}
-	return &proto.BotResponse{Status: res.Status, Body: res.Body}, nil
+	return &proto.BotResponse{Status: res.Status, Body: res.Body, ContentType: res.ContentType}, nil
 }
 
 // IpfsHandler
@@ -347,8 +349,6 @@ func (m *GRPCBotStoreClient) Delete(key string) (bool, error) {
 }
 
 func (m *GRPCBotStoreClient) Set(key string, data []byte) (bool, error) {
-	fmt.Println("SETTING", key)
-	fmt.Println("SETTING", data)
 	resp, err := m.client.Set(context.Background(), &proto.SetByKey{
 		Key:  key,
 		Data: data,
