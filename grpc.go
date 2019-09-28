@@ -69,7 +69,7 @@ func (m *GRPCClient) Delete(q []byte, st shared.BotStore, i shared.IpfsHandler) 
 	}, nil
 }
 
-func (m *GRPCClient) Put(q []byte, st shared.BotStore, i shared.IpfsHandler) (shared.Response, error) {
+func (m *GRPCClient) Put(q []byte, b []byte, st shared.BotStore, i shared.IpfsHandler) (shared.Response, error) {
 
 	botStoreServer := &GRPCBotStoreServer{Impl: st}
 	var s *grpc.Server
@@ -93,10 +93,11 @@ func (m *GRPCClient) Put(q []byte, st shared.BotStore, i shared.IpfsHandler) (sh
 	ipfsBrokerID := m.broker.NextId()
 	go m.broker.AcceptAndServe(ipfsBrokerID, ipfsServerFunc)
 
-	resp, err := m.client.Put(context.Background(), &proto.APIRequest{
+	resp, err := m.client.Put(context.Background(), &proto.APIRequestB{
 		BotStoreServer:    storeBrokerID,
 		IpfsHandlerServer: ipfsBrokerID,
 		Data:              q,
+		Body:              b,
 	})
 
 	s.Stop()
@@ -113,7 +114,7 @@ func (m *GRPCClient) Put(q []byte, st shared.BotStore, i shared.IpfsHandler) (sh
 	}, nil
 }
 
-func (m *GRPCClient) Post(q []byte, st shared.BotStore, i shared.IpfsHandler) (shared.Response, error) {
+func (m *GRPCClient) Post(q []byte, b []byte, st shared.BotStore, i shared.IpfsHandler) (shared.Response, error) {
 
 	botStoreServer := &GRPCBotStoreServer{Impl: st}
 	var s *grpc.Server
@@ -137,10 +138,11 @@ func (m *GRPCClient) Post(q []byte, st shared.BotStore, i shared.IpfsHandler) (s
 	ipfsBrokerID := m.broker.NextId()
 	go m.broker.AcceptAndServe(ipfsBrokerID, ipfsServerFunc)
 
-	resp, err := m.client.Post(context.Background(), &proto.APIRequest{
+	resp, err := m.client.Post(context.Background(), &proto.APIRequestB{
 		BotStoreServer:    storeBrokerID,
 		IpfsHandlerServer: ipfsBrokerID,
 		Data:              q,
+		Body:              b,
 	})
 
 	s.Stop()
@@ -235,7 +237,7 @@ func (m *GRPCServer) Delete(ctx context.Context, req *proto.APIRequest) (*proto.
 	return &proto.BotResponse{Status: res.Status, Body: res.Body, ContentType: res.ContentType}, nil
 }
 
-func (m *GRPCServer) Put(ctx context.Context, req *proto.APIRequest) (*proto.BotResponse, error) {
+func (m *GRPCServer) Put(ctx context.Context, req *proto.APIRequestB) (*proto.BotResponse, error) {
 
 	conn, err := m.broker.Dial(req.BotStoreServer)
 	if err != nil {
@@ -251,14 +253,14 @@ func (m *GRPCServer) Put(ctx context.Context, req *proto.APIRequest) (*proto.Bot
 	defer conn2.Close()
 	i := &GRPCIpfsHandlerClient{proto.NewIpfsHandlerClient(conn2)}
 
-	res, err := m.Impl.Put(req.Data, s, i)
+	res, err := m.Impl.Put(req.Data, req.Body, s, i)
 	if err != nil {
 		return nil, err
 	}
 	return &proto.BotResponse{Status: res.Status, Body: res.Body, ContentType: res.ContentType}, nil
 }
 
-func (m *GRPCServer) Post(ctx context.Context, req *proto.APIRequest) (*proto.BotResponse, error) {
+func (m *GRPCServer) Post(ctx context.Context, req *proto.APIRequestB) (*proto.BotResponse, error) {
 
 	conn, err := m.broker.Dial(req.BotStoreServer)
 	if err != nil {
@@ -274,7 +276,7 @@ func (m *GRPCServer) Post(ctx context.Context, req *proto.APIRequest) (*proto.Bo
 	defer conn2.Close()
 	i := &GRPCIpfsHandlerClient{proto.NewIpfsHandlerClient(conn2)}
 
-	res, err := m.Impl.Post(req.Data, s, i)
+	res, err := m.Impl.Post(req.Data, req.Body, s, i)
 	if err != nil {
 		return nil, err
 	}
@@ -304,7 +306,7 @@ func (m *GRPCServer) Get(ctx context.Context, req *proto.APIRequest) (*proto.Bot
 	return &proto.BotResponse{Status: res.Status, Body: res.Body, ContentType: res.ContentType}, nil
 }
 
-// IpfsHandler
+// IpfsHandler Client
 func (m *GRPCIpfsHandlerClient) Get(path string, key string) ([]byte, error) {
 	resp, err := m.client.Get(context.Background(), &proto.GetData{
 		Path: path,
@@ -317,6 +319,19 @@ func (m *GRPCIpfsHandlerClient) Get(path string, key string) ([]byte, error) {
 	return resp.Data, err
 }
 
+func (m *GRPCIpfsHandlerClient) Add(data []byte, encrypt bool) (string, string, error) {
+	resp, err := m.client.Add(context.Background(), &proto.AddData{
+		Data:    data,
+		Encrypt: encrypt,
+	})
+	if err != nil {
+		hclog.Default().Info("ipfs.Get", "client", "start", "err", err)
+		return "", "", err
+	}
+	return resp.Hash, resp.Key, err
+}
+
+// IpfsHandler Server
 func (m *GRPCIpfsHandlerServer) Get(ctx context.Context, req *proto.GetData) (resp *proto.ByteData, err error) {
 	d, err := m.Impl.Get(req.Path, req.Key)
 	if err != nil {
@@ -325,16 +340,24 @@ func (m *GRPCIpfsHandlerServer) Get(ctx context.Context, req *proto.GetData) (re
 	return &proto.ByteData{Data: d}, err
 }
 
+func (m *GRPCIpfsHandlerServer) Add(ctx context.Context, req *proto.AddData) (resp *proto.IPFSPin, err error) {
+	h, k, err := m.Impl.Add(req.Data, req.Encrypt)
+	if err != nil {
+		return nil, err
+	}
+	return &proto.IPFSPin{Hash: h, Key: k}, err
+}
+
 // BotStore Client
-func (m *GRPCBotStoreClient) Get(key string) ([]byte, error) {
+func (m *GRPCBotStoreClient) Get(key string) ([]byte, int32, error) {
 	resp, err := m.client.Get(context.Background(), &proto.ByKey{
 		Key: key,
 	})
 	if err != nil {
 		hclog.Default().Info("store.Get", "client", "start", "err", err)
-		return nil, err
+		return nil, 0, err
 	}
-	return resp.Data, err
+	return resp.Data, resp.Version, err
 }
 
 func (m *GRPCBotStoreClient) Delete(key string) (bool, error) {
@@ -361,13 +384,12 @@ func (m *GRPCBotStoreClient) Set(key string, data []byte) (bool, error) {
 }
 
 // BotStore Server
-
-func (m *GRPCBotStoreServer) Get(ctx context.Context, req *proto.ByKey) (resp *proto.ByteData, err error) {
-	d, err := m.Impl.Get(req.Key)
+func (m *GRPCBotStoreServer) Get(ctx context.Context, req *proto.ByKey) (resp *proto.KeyValResponse, err error) {
+	d, v, err := m.Impl.Get(req.Key)
 	if err != nil {
 		return nil, err
 	}
-	return &proto.ByteData{Data: d}, err
+	return &proto.KeyValResponse{Data: d, Version: v}, err
 }
 
 func (m *GRPCBotStoreServer) Delete(ctx context.Context, req *proto.ByKey) (resp *proto.Success, err error) {
