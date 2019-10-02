@@ -18,16 +18,16 @@ type GRPCClient struct {
 // Here is the gRPC server that GRPCClient talks to.
 type GRPCBotStoreServer struct {
 	// This is the real implementation
-	Impl shared.BotStore
+	Impl shared.Store
 }
 type GRPCIpfsHandlerServer struct {
 	// This is the real implementation
-	Impl shared.IpfsHandler
+	Impl shared.Ipfs
 }
 
-func (m *GRPCClient) Delete(q []byte, st shared.BotStore, i shared.IpfsHandler) (shared.Response, error) {
+func (m *GRPCClient) Delete(q []byte, config shared.ClientConfig) (shared.Response, error) {
 
-	botStoreServer := &GRPCBotStoreServer{Impl: st}
+	botStoreServer := &GRPCBotStoreServer{Impl: config.Store}
 	var s *grpc.Server
 	storeServerFunc := func(opts []grpc.ServerOption) *grpc.Server {
 		s = grpc.NewServer(opts...)
@@ -38,7 +38,7 @@ func (m *GRPCClient) Delete(q []byte, st shared.BotStore, i shared.IpfsHandler) 
 	storeBrokerID := m.broker.NextId()
 	go m.broker.AcceptAndServe(storeBrokerID, storeServerFunc)
 
-	ipfsHandlerServer := &GRPCIpfsHandlerServer{Impl: i}
+	ipfsHandlerServer := &GRPCIpfsHandlerServer{Impl: config.Ipfs}
 	var s2 *grpc.Server
 	ipfsServerFunc := func(opts []grpc.ServerOption) *grpc.Server {
 		s2 = grpc.NewServer(opts...)
@@ -50,9 +50,12 @@ func (m *GRPCClient) Delete(q []byte, st shared.BotStore, i shared.IpfsHandler) 
 	go m.broker.AcceptAndServe(ipfsBrokerID, ipfsServerFunc)
 
 	resp, err := m.client.Delete(context.Background(), &proto.APIRequest{
-		BotStoreServer:    storeBrokerID,
-		IpfsHandlerServer: ipfsBrokerID,
-		Data:              q,
+		Data: q,
+		Setup: &proto.ClientConfig{
+			BotStoreServer:    storeBrokerID,
+			IpfsHandlerServer: ipfsBrokerID,
+			Params:            config.Params,
+		},
 	})
 
 	s.Stop()
@@ -69,9 +72,9 @@ func (m *GRPCClient) Delete(q []byte, st shared.BotStore, i shared.IpfsHandler) 
 	}, nil
 }
 
-func (m *GRPCClient) Put(q []byte, b []byte, st shared.BotStore, i shared.IpfsHandler) (shared.Response, error) {
+func (m *GRPCClient) Put(q []byte, b []byte, config shared.ClientConfig) (shared.Response, error) {
 
-	botStoreServer := &GRPCBotStoreServer{Impl: st}
+	botStoreServer := &GRPCBotStoreServer{Impl: config.Store}
 	var s *grpc.Server
 	storeServerFunc := func(opts []grpc.ServerOption) *grpc.Server {
 		s = grpc.NewServer(opts...)
@@ -82,7 +85,7 @@ func (m *GRPCClient) Put(q []byte, b []byte, st shared.BotStore, i shared.IpfsHa
 	storeBrokerID := m.broker.NextId()
 	go m.broker.AcceptAndServe(storeBrokerID, storeServerFunc)
 
-	ipfsHandlerServer := &GRPCIpfsHandlerServer{Impl: i}
+	ipfsHandlerServer := &GRPCIpfsHandlerServer{Impl: config.Ipfs}
 	var s2 *grpc.Server
 	ipfsServerFunc := func(opts []grpc.ServerOption) *grpc.Server {
 		s2 = grpc.NewServer(opts...)
@@ -94,10 +97,13 @@ func (m *GRPCClient) Put(q []byte, b []byte, st shared.BotStore, i shared.IpfsHa
 	go m.broker.AcceptAndServe(ipfsBrokerID, ipfsServerFunc)
 
 	resp, err := m.client.Put(context.Background(), &proto.APIRequestB{
-		BotStoreServer:    storeBrokerID,
-		IpfsHandlerServer: ipfsBrokerID,
-		Data:              q,
-		Body:              b,
+		Data: q,
+		Body: b,
+		Setup: &proto.ClientConfig{
+			BotStoreServer:    storeBrokerID,
+			IpfsHandlerServer: ipfsBrokerID,
+			Params:            config.Params,
+		},
 	})
 
 	s.Stop()
@@ -114,9 +120,9 @@ func (m *GRPCClient) Put(q []byte, b []byte, st shared.BotStore, i shared.IpfsHa
 	}, nil
 }
 
-func (m *GRPCClient) Post(q []byte, b []byte, st shared.BotStore, i shared.IpfsHandler) (shared.Response, error) {
+func (m *GRPCClient) Post(q []byte, b []byte, config shared.ClientConfig) (shared.Response, error) {
 
-	botStoreServer := &GRPCBotStoreServer{Impl: st}
+	botStoreServer := &GRPCBotStoreServer{Impl: config.Store}
 	var s *grpc.Server
 	storeServerFunc := func(opts []grpc.ServerOption) *grpc.Server {
 		s = grpc.NewServer(opts...)
@@ -127,7 +133,7 @@ func (m *GRPCClient) Post(q []byte, b []byte, st shared.BotStore, i shared.IpfsH
 	storeBrokerID := m.broker.NextId()
 	go m.broker.AcceptAndServe(storeBrokerID, storeServerFunc)
 
-	ipfsHandlerServer := &GRPCIpfsHandlerServer{Impl: i}
+	ipfsHandlerServer := &GRPCIpfsHandlerServer{Impl: config.Ipfs}
 	var s2 *grpc.Server
 	ipfsServerFunc := func(opts []grpc.ServerOption) *grpc.Server {
 		s2 = grpc.NewServer(opts...)
@@ -139,10 +145,13 @@ func (m *GRPCClient) Post(q []byte, b []byte, st shared.BotStore, i shared.IpfsH
 	go m.broker.AcceptAndServe(ipfsBrokerID, ipfsServerFunc)
 
 	resp, err := m.client.Post(context.Background(), &proto.APIRequestB{
-		BotStoreServer:    storeBrokerID,
-		IpfsHandlerServer: ipfsBrokerID,
-		Data:              q,
-		Body:              b,
+		Data: q,
+		Body: b,
+		Setup: &proto.ClientConfig{
+			BotStoreServer:    storeBrokerID,
+			IpfsHandlerServer: ipfsBrokerID,
+			Params:            config.Params,
+		},
 	})
 
 	s.Stop()
@@ -159,9 +168,9 @@ func (m *GRPCClient) Post(q []byte, b []byte, st shared.BotStore, i shared.IpfsH
 	}, nil
 }
 
-func (m *GRPCClient) Get(q []byte, st shared.BotStore, i shared.IpfsHandler) (shared.Response, error) {
+func (m *GRPCClient) Get(q []byte, config shared.ClientConfig) (shared.Response, error) {
 
-	botStoreServer := &GRPCBotStoreServer{Impl: st}
+	botStoreServer := &GRPCBotStoreServer{Impl: config.Store}
 	var s *grpc.Server
 	storeServerFunc := func(opts []grpc.ServerOption) *grpc.Server {
 		s = grpc.NewServer(opts...)
@@ -172,7 +181,7 @@ func (m *GRPCClient) Get(q []byte, st shared.BotStore, i shared.IpfsHandler) (sh
 	storeBrokerID := m.broker.NextId()
 	go m.broker.AcceptAndServe(storeBrokerID, storeServerFunc)
 
-	ipfsHandlerServer := &GRPCIpfsHandlerServer{Impl: i}
+	ipfsHandlerServer := &GRPCIpfsHandlerServer{Impl: config.Ipfs}
 	var s2 *grpc.Server
 	ipfsServerFunc := func(opts []grpc.ServerOption) *grpc.Server {
 		s2 = grpc.NewServer(opts...)
@@ -184,9 +193,12 @@ func (m *GRPCClient) Get(q []byte, st shared.BotStore, i shared.IpfsHandler) (sh
 	go m.broker.AcceptAndServe(ipfsBrokerID, ipfsServerFunc)
 
 	resp, err := m.client.Get(context.Background(), &proto.APIRequest{
-		BotStoreServer:    storeBrokerID,
-		IpfsHandlerServer: ipfsBrokerID,
-		Data:              q,
+		Data: q,
+		Setup: &proto.ClientConfig{
+			BotStoreServer:    storeBrokerID,
+			IpfsHandlerServer: ipfsBrokerID,
+			Params:            config.Params,
+		},
 	})
 
 	s.Stop()
@@ -206,7 +218,7 @@ func (m *GRPCClient) Get(q []byte, st shared.BotStore, i shared.IpfsHandler) (sh
 // Here is the gRPC server that GRPCClient talks to.
 type GRPCServer struct {
 	// This is the real implementation
-	Impl shared.Botservice
+	Impl shared.Service
 
 	broker *plugin.GRPCBroker
 }
@@ -216,21 +228,25 @@ type GRPCBotStoreClient struct{ client proto.BotStoreClient }
 
 func (m *GRPCServer) Delete(ctx context.Context, req *proto.APIRequest) (*proto.BotResponse, error) {
 
-	conn, err := m.broker.Dial(req.BotStoreServer)
+	conn, err := m.broker.Dial(req.Setup.BotStoreServer)
 	if err != nil {
 		return nil, err
 	}
 	defer conn.Close()
 	s := &GRPCBotStoreClient{proto.NewBotStoreClient(conn)}
 
-	conn2, err := m.broker.Dial(req.IpfsHandlerServer)
+	conn2, err := m.broker.Dial(req.Setup.IpfsHandlerServer)
 	if err != nil {
 		return nil, err
 	}
 	defer conn2.Close()
 	i := &GRPCIpfsHandlerClient{proto.NewIpfsHandlerClient(conn2)}
-
-	res, err := m.Impl.Delete(req.Data, s, i)
+	setup := shared.ClientConfig{
+		s,
+		i,
+		req.Setup.Params,
+	}
+	res, err := m.Impl.Delete(req.Data, setup)
 	if err != nil {
 		return nil, err
 	}
@@ -239,21 +255,26 @@ func (m *GRPCServer) Delete(ctx context.Context, req *proto.APIRequest) (*proto.
 
 func (m *GRPCServer) Put(ctx context.Context, req *proto.APIRequestB) (*proto.BotResponse, error) {
 
-	conn, err := m.broker.Dial(req.BotStoreServer)
+	conn, err := m.broker.Dial(req.Setup.BotStoreServer)
 	if err != nil {
 		return nil, err
 	}
 	defer conn.Close()
 	s := &GRPCBotStoreClient{proto.NewBotStoreClient(conn)}
 
-	conn2, err := m.broker.Dial(req.IpfsHandlerServer)
+	conn2, err := m.broker.Dial(req.Setup.IpfsHandlerServer)
 	if err != nil {
 		return nil, err
 	}
 	defer conn2.Close()
 	i := &GRPCIpfsHandlerClient{proto.NewIpfsHandlerClient(conn2)}
 
-	res, err := m.Impl.Put(req.Data, req.Body, s, i)
+	setup := shared.ClientConfig{
+		s,
+		i,
+		req.Setup.Params,
+	}
+	res, err := m.Impl.Put(req.Data, req.Body, setup)
 	if err != nil {
 		return nil, err
 	}
@@ -262,21 +283,26 @@ func (m *GRPCServer) Put(ctx context.Context, req *proto.APIRequestB) (*proto.Bo
 
 func (m *GRPCServer) Post(ctx context.Context, req *proto.APIRequestB) (*proto.BotResponse, error) {
 
-	conn, err := m.broker.Dial(req.BotStoreServer)
+	conn, err := m.broker.Dial(req.Setup.BotStoreServer)
 	if err != nil {
 		return nil, err
 	}
 	defer conn.Close()
 	s := &GRPCBotStoreClient{proto.NewBotStoreClient(conn)}
 
-	conn2, err := m.broker.Dial(req.IpfsHandlerServer)
+	conn2, err := m.broker.Dial(req.Setup.IpfsHandlerServer)
 	if err != nil {
 		return nil, err
 	}
 	defer conn2.Close()
 	i := &GRPCIpfsHandlerClient{proto.NewIpfsHandlerClient(conn2)}
 
-	res, err := m.Impl.Post(req.Data, req.Body, s, i)
+	setup := shared.ClientConfig{
+		s,
+		i,
+		req.Setup.Params,
+	}
+	res, err := m.Impl.Post(req.Data, req.Body, setup)
 	if err != nil {
 		return nil, err
 	}
@@ -285,21 +311,26 @@ func (m *GRPCServer) Post(ctx context.Context, req *proto.APIRequestB) (*proto.B
 
 func (m *GRPCServer) Get(ctx context.Context, req *proto.APIRequest) (*proto.BotResponse, error) {
 
-	conn, err := m.broker.Dial(req.BotStoreServer)
+	conn, err := m.broker.Dial(req.Setup.BotStoreServer)
 	if err != nil {
 		return nil, err
 	}
 	defer conn.Close()
 	s := &GRPCBotStoreClient{proto.NewBotStoreClient(conn)}
 
-	conn2, err := m.broker.Dial(req.IpfsHandlerServer)
+	conn2, err := m.broker.Dial(req.Setup.IpfsHandlerServer)
 	if err != nil {
 		return nil, err
 	}
 	defer conn2.Close()
 	i := &GRPCIpfsHandlerClient{proto.NewIpfsHandlerClient(conn2)}
 
-	res, err := m.Impl.Get(req.Data, s, i)
+	setup := shared.ClientConfig{
+		s,
+		i,
+		req.Setup.Params,
+	}
+	res, err := m.Impl.Get(req.Data, setup)
 	if err != nil {
 		return nil, err
 	}
