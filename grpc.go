@@ -26,7 +26,6 @@ type GRPCIpfsHandlerServer struct {
 }
 
 func (m *GRPCClient) Delete(q []byte, config shared.ClientConfig) (shared.Response, error) {
-
 	botStoreServer := &GRPCBotStoreServer{Impl: config.Store}
 	var s *grpc.Server
 	storeServerFunc := func(opts []grpc.ServerOption) *grpc.Server {
