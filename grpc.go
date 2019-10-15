@@ -3,6 +3,7 @@ package textilebots
 import (
 	hclog "github.com/hashicorp/go-hclog"
 	plugin "github.com/hashicorp/go-plugin"
+	"github.com/ipfs/go-datastore"
 	shared "github.com/textileio/go-textile-core/bots"
 	proto "github.com/textileio/go-textile-core/bots/pb"
 	"golang.org/x/net/context"
@@ -18,7 +19,7 @@ type GRPCClient struct {
 // Here is the gRPC server that GRPCClient talks to.
 type GRPCBotStoreServer struct {
 	// This is the real implementation
-	Impl shared.Store
+	Impl datastore.Datastore
 }
 type GRPCIpfsHandlerServer struct {
 	// This is the real implementation
@@ -415,25 +416,20 @@ func (m *GRPCBotStoreClient) Set(key string, data []byte) (bool, error) {
 
 // BotStore Server
 func (m *GRPCBotStoreServer) Get(ctx context.Context, req *proto.ByKey) (resp *proto.KeyValResponse, err error) {
-	d, v, err := m.Impl.Get(req.Key)
+	key := datastore.NewKey(req.Key)
+	d, err := m.Impl.Get(key)
 	if err != nil {
 		return nil, err
 	}
-	return &proto.KeyValResponse{Data: d, Version: v}, err
+	return &proto.KeyValResponse{Data: d}, err
 }
 
-func (m *GRPCBotStoreServer) Delete(ctx context.Context, req *proto.ByKey) (resp *proto.Success, err error) {
-	s, err := m.Impl.Delete(req.Key)
-	if err != nil {
-		return nil, err
-	}
-	return &proto.Success{Success: s}, err
+func (m *GRPCBotStoreServer) Delete(ctx context.Context, req *proto.ByKey) (err error) {
+	key := datastore.NewKey(req.Key)
+	return m.Impl.Delete(key)
 }
 
-func (m *GRPCBotStoreServer) Set(ctx context.Context, req *proto.SetByKey) (resp *proto.Success, err error) {
-	s, err := m.Impl.Set(req.Key, req.Data)
-	if err != nil {
-		return nil, err
-	}
-	return &proto.Success{Success: s}, err
+func (m *GRPCBotStoreServer) Put(ctx context.Context, req *proto.SetByKey) (err error) {
+	key := datastore.NewKey(req.Key)
+	return m.Impl.Put(key, req.Data)
 }
