@@ -19,7 +19,7 @@ type GRPCClient struct {
 // Here is the gRPC server that GRPCClient talks to.
 type GRPCBotStoreServer struct {
 	// This is the real implementation
-	Impl shared.DatastoreBasic
+	Impl shared.DatastoreWithoutQuery
 }
 type GRPCIpfsHandlerServer struct {
 	// This is the real implementation
