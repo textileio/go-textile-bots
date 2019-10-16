@@ -3,6 +3,7 @@ package textilebots
 import (
 	hclog "github.com/hashicorp/go-hclog"
 	plugin "github.com/hashicorp/go-plugin"
+	"github.com/ipfs/go-datastore"
 	shared "github.com/textileio/go-textile-core/bots"
 	proto "github.com/textileio/go-textile-core/bots/pb"
 	"golang.org/x/net/context"
@@ -18,7 +19,7 @@ type GRPCClient struct {
 // Here is the gRPC server that GRPCClient talks to.
 type GRPCBotStoreServer struct {
 	// This is the real implementation
-	Impl shared.Store
+	Impl shared.DatastoreBasic
 }
 type GRPCIpfsHandlerServer struct {
 	// This is the real implementation
@@ -379,61 +380,106 @@ func (m *GRPCIpfsHandlerServer) Add(ctx context.Context, req *proto.AddData) (re
 }
 
 // BotStore Client
-func (m *GRPCBotStoreClient) Get(key string) ([]byte, int32, error) {
-	resp, err := m.client.Get(context.Background(), &proto.ByKey{
-		Key: key,
+func (m *GRPCBotStoreClient) Get(key datastore.Key) ([]byte, error) {
+	resp, err := m.client.Get(context.Background(), &proto.DatastoreKey{
+		Struct: &proto.StructKey{Key: key.String()},
 	})
 	if err != nil {
 		hclog.Default().Info("store.Get", "client", "start", "err", err)
-		return nil, 0, err
+		return []byte{}, err
 	}
-	return resp.Data, resp.Version, err
+	return resp.Data, err
 }
 
-func (m *GRPCBotStoreClient) Delete(key string) (bool, error) {
-	resp, err := m.client.Delete(context.Background(), &proto.ByKey{
-		Key: key,
+func (m *GRPCBotStoreClient) GetSize(key datastore.Key) (int, error) {
+	resp, err := m.client.GetSize(context.Background(), &proto.DatastoreKey{
+		Struct: &proto.StructKey{Key: key.String()},
+	})
+	if err != nil {
+		hclog.Default().Info("store.GetSize", "client", "start", "err", err)
+		return 0, err
+	}
+	return int(resp.Size), err
+}
+
+func (m *GRPCBotStoreClient) Has(key datastore.Key) (bool, error) {
+	resp, err := m.client.Has(context.Background(), &proto.DatastoreKey{
+		Struct: &proto.StructKey{Key: key.String()},
+	})
+	if err != nil {
+		hclog.Default().Info("store.Has", "client", "start", "err", err)
+		return false, err
+	}
+	return resp.Exists, err
+}
+
+func (m *GRPCBotStoreClient) Delete(key datastore.Key) error {
+	_, err := m.client.Delete(context.Background(), &proto.DatastoreKey{
+		Struct: &proto.StructKey{Key: key.String()},
 	})
 	if err != nil {
 		hclog.Default().Info("store.Delete", "client", "start", "err", err)
-		return false, err
 	}
-	return resp.Success, err
+	return err
 }
 
-func (m *GRPCBotStoreClient) Set(key string, data []byte) (bool, error) {
-	resp, err := m.client.Set(context.Background(), &proto.SetByKey{
-		Key:  key,
-		Data: data,
+func (m *GRPCBotStoreClient) Put(key datastore.Key, value []byte) error {
+	_, err := m.client.Put(context.Background(), &proto.DatastoreKeyValue{
+		Key:   key.String(),
+		Value: value,
 	})
 	if err != nil {
 		hclog.Default().Info("store.Set", "client", "start", "err", err)
-		return false, err
 	}
-	return resp.Success, err
+	return err
+}
+
+func (m *GRPCBotStoreClient) Close() error {
+	_, err := m.client.Close(context.Background(), &proto.Empty{})
+	if err != nil {
+		hclog.Default().Info("store.Set", "client", "start", "err", err)
+	}
+	return err
 }
 
 // BotStore Server
-func (m *GRPCBotStoreServer) Get(ctx context.Context, req *proto.ByKey) (resp *proto.KeyValResponse, err error) {
-	d, v, err := m.Impl.Get(req.Key)
+func (m *GRPCBotStoreServer) Get(ctx context.Context, req *proto.DatastoreKey) (resp *proto.KeyValResponse, err error) {
+	key := datastore.NewKey(req.Struct.Key)
+	d, err := m.Impl.Get(key)
 	if err != nil {
-		return nil, err
+		return &proto.KeyValResponse{}, err
 	}
-	return &proto.KeyValResponse{Data: d, Version: v}, err
+	return &proto.KeyValResponse{Data: d}, err
 }
 
-func (m *GRPCBotStoreServer) Delete(ctx context.Context, req *proto.ByKey) (resp *proto.Success, err error) {
-	s, err := m.Impl.Delete(req.Key)
+func (m *GRPCBotStoreServer) GetSize(ctx context.Context, req *proto.DatastoreKey) (resp *proto.DatastoreSize, err error) {
+	key := datastore.NewKey(req.Struct.Key)
+	s, err := m.Impl.GetSize(key)
 	if err != nil {
-		return nil, err
+		return &proto.DatastoreSize{}, err
 	}
-	return &proto.Success{Success: s}, err
+	return &proto.DatastoreSize{Size: int32(s)}, err
 }
 
-func (m *GRPCBotStoreServer) Set(ctx context.Context, req *proto.SetByKey) (resp *proto.Success, err error) {
-	s, err := m.Impl.Set(req.Key, req.Data)
+func (m *GRPCBotStoreServer) Has(ctx context.Context, req *proto.DatastoreKey) (resp *proto.Exists, err error) {
+	key := datastore.NewKey(req.Struct.Key)
+	ex, err := m.Impl.Has(key)
 	if err != nil {
-		return nil, err
+		return &proto.Exists{}, err
 	}
-	return &proto.Success{Success: s}, err
+	return &proto.Exists{Exists: ex}, err
+}
+
+func (m *GRPCBotStoreServer) Delete(ctx context.Context, req *proto.DatastoreKey) (resp *proto.Empty, err error) {
+	key := datastore.NewKey(req.Struct.Key)
+	return &proto.Empty{}, m.Impl.Delete(key)
+}
+
+func (m *GRPCBotStoreServer) Put(ctx context.Context, req *proto.DatastoreKeyValue) (resp *proto.Empty, err error) {
+	key := datastore.NewKey(req.Key)
+	return &proto.Empty{}, m.Impl.Put(key, req.Value)
+}
+
+func (m *GRPCBotStoreServer) Close(ctx context.Context, req *proto.Empty) (resp *proto.Empty, err error) {
+	return &proto.Empty{}, m.Impl.Close()
 }
